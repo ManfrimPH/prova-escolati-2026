@@ -133,3 +133,21 @@ def rechamar(codigo: str):
         
         senha["chamada_em"] = get_agora().isoformat(timespec='seconds')
     return JSONResponse(content=senha, status_code=200)
+
+@app.post("/senhas/{codigo}/cancelar")
+def cancelar(codigo: str):
+    with gerenciar_banco() as db:
+        senha = next((s for s in db["senhas"] if s["codigo"] == codigo), None)
+        if not senha: return JSONResponse(content={"erro": "nao_encontrada"}, status_code=404)
+        if senha["status"] != "aguardando": return JSONResponse(content={"erro": "status_invalido"}, status_code=409)
+        
+        senha["status"] = "cancelada"
+    return JSONResponse(content={"mensagem": "senha cancelada"})
+
+@app.get("/painel")
+def painel():
+    with gerenciar_banco(somente_leitura=True) as db:
+        chamadas = [s for s in db["senhas"] if s["status"] == "chamada"]
+        chamadas.sort(key=lambda x: x["chamada_em"], reverse=True)
+        
+    return JSONResponse(content={"chamadas": chamadas[:5]}, status_code=200)
