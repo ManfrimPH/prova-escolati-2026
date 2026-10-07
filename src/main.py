@@ -1,4 +1,9 @@
 #import
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from datetime import datetime, timezone, timedelta
+import os, json, fcntl
+from contextlib import contextmanager
 
 #coisas que vou usar aq
 
@@ -72,3 +77,35 @@ async def gerar_senha(request: Request):
         db["senhas"].append(senha)
         
     return JSONResponse(content=senha, status_code=201)
+
+@app.get("/senhas/proxima")
+def chamar_proxima():
+    with gerenciar_banco() as db:
+        aguardando = [s for s in db["senhas"] if s["status"] == "aguardando"]
+        pref = [s for s in aguardando if s["tipo"] == "preferencial"]
+        norm = [s for s in aguardando if s["tipo"] == "normal"]
+        
+        escolhida = None
+        
+        if db["consec_pref"] < RAZAO_PREF:
+            if pref:
+                escolhida = pref[0]
+                db["consec_pref"] += 1
+            elif norm:
+                escolhida = norm[0]
+                db["consec_pref"] = 0
+        else:
+            if norm:
+                escolhida = norm[0]
+                db["consec_pref"] = 0
+            elif pref:
+                escolhida = pref[0]
+                db["consec_pref"] += 1
+                
+        if not escolhida:
+            return JSONResponse(content={"erro": "fila_vazia"}, status_code=404)
+            
+        escolhida["status"] = "chamada"
+        escolhida["chamada_em"] = get_agora().isoformat(timespec='seconds')
+        
+    return JSONResponse(content=escolhida, status_code=200)
