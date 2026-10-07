@@ -109,3 +109,27 @@ def chamar_proxima():
         escolhida["chamada_em"] = get_agora().isoformat(timespec='seconds')
         
     return JSONResponse(content=escolhida, status_code=200)
+
+@app.post("/senhas/{codigo}/concluir")
+def concluir(codigo: str):
+    with gerenciar_banco() as db:
+        senha = next((s for s in db["senhas"] if s["codigo"] == codigo), None)
+        if not senha: 
+            return JSONResponse(content={"erro": "senha_nao_encontrada"}, status_code=404)
+        if senha["status"] != "chamada": 
+            return JSONResponse(content={"erro": "senha_nao_chamada"}, status_code=409)
+        
+        senha["status"] = "concluida"
+    return JSONResponse(content=senha, status_code=200)
+
+@app.post("/senhas/{codigo}/rechamar")
+def rechamar(codigo: str):
+    with gerenciar_banco() as db:
+        senha = next((s for s in db["senhas"] if s["codigo"] == codigo), None)
+        if not senha: 
+            return JSONResponse(content={"erro": "senha_nao_encontrada"}, status_code=404)
+        if senha["status"] != "chamada": 
+            return JSONResponse(content={"erro": "senha_nao_chamada"}, status_code=409)
+        
+        senha["chamada_em"] = get_agora().isoformat(timespec='seconds')
+    return JSONResponse(content=senha, status_code=200)
